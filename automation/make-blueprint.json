@@ -1,0 +1,235 @@
+{
+  "name": "Immo Privat – Lead Funnel: Tally → Router → Telegram / Google Sheets",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": "YOUR_MAKE_WEBHOOK_ID",
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": {
+          "parameters": {
+            "hook": {
+              "data": { "editable": true },
+              "label": "Tally Form Webhook – Immo Privat Qualifikation"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "hook",
+            "type": "hook:gateway-webhook",
+            "label": "Webhook",
+            "required": true
+          },
+          {
+            "name": "maxResults",
+            "type": "number",
+            "label": "Maximum number of results"
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 300, "y": 0 }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 3,
+              "module": "http:ActionSendData",
+              "version": 3,
+              "parameters": {
+                "handleErrors": false,
+                "useNewZLibDeCompression": true
+              },
+              "mapper": {
+                "url": "https://api.telegram.org/bot YOUR_TELEGRAM_BOT_TOKEN/sendMessage",
+                "serializeUrl": false,
+                "method": "post",
+                "headers": [
+                  {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "qs": [],
+                "bodyType": "raw",
+                "parseResponse": true,
+                "authUser": "",
+                "authPass": "",
+                "timeout": "",
+                "shareCookies": false,
+                "ca": "",
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "contentType": "application/json",
+                "data": "{\n  \"chat_id\": \"YOUR_TELEGRAM_CHAT_ID\",\n  \"parse_mode\": \"Markdown\",\n  \"text\": \"*DRINGEND – Neuer Lead*\\n\\n*Name:* {{1.data.name}}\\n*E-Mail:* {{1.data.email}}\\n*Telefon:* {{1.data.phone}}\\n*Dringlichkeit:* {{1.data.urgency_level}}/5\\n*Eigenkapital:* {{1.data.equity_status}}\\n*Objektart:* {{1.data.property_type}}\\n*Standort:* {{1.data.location}}\\n*Geschätzter Wert:* {{1.data.estimated_value}}\\n\\n_Eingegangen: {{now}}_\"\n}"
+              },
+              "metadata": {
+                "designer": { "x": 600, "y": -150 },
+                "restore": {
+                  "expect": {
+                    "method": { "label": "POST" },
+                    "bodyType": { "label": "Raw" },
+                    "contentType": { "label": "JSON (application/json)" }
+                  }
+                },
+                "expect": [
+                  { "name": "url",              "type": "url",     "label": "URL",          "required": true },
+                  { "name": "serializeUrl",     "type": "boolean", "label": "Serialize URL" },
+                  { "name": "method",           "type": "select",  "label": "Method",        "required": true, "validate": { "enum": ["get","head","post","put","patch","delete","options"] } },
+                  { "name": "headers",          "type": "array",   "label": "Headers" },
+                  { "name": "qs",               "type": "array",   "label": "Query String" },
+                  { "name": "bodyType",         "type": "select",  "label": "Body type" },
+                  { "name": "data",             "type": "string",  "label": "Request content" },
+                  { "name": "parseResponse",    "type": "boolean", "label": "Parse response" },
+                  { "name": "timeout",          "type": "uinteger","label": "Timeout" },
+                  { "name": "followRedirect",   "type": "boolean", "label": "Follow redirect" },
+                  { "name": "gzip",             "type": "boolean", "label": "Use gzip" },
+                  { "name": "rejectUnauthorized","type": "boolean","label": "Reject connections that use unverified (self-signed) certificates" },
+                  { "name": "useMtls",          "type": "boolean", "label": "Use Mutual TLS" }
+                ]
+              }
+            }
+          ],
+          "label": "High-Priority Lead (urgency >= 4 AND equity verified)",
+          "filter": {
+            "name": "Dringend & Eigenkapital verifiziert",
+            "conditions": [
+              [
+                {
+                  "a": "{{1.data.urgency_level}}",
+                  "b": "4",
+                  "o": "number:greaterThanOrEqualTo"
+                },
+                {
+                  "a": "{{1.data.equity_status}}",
+                  "b": "verified",
+                  "o": "text:equal"
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "flow": [
+            {
+              "id": 4,
+              "module": "google-sheets:addRow",
+              "version": 2,
+              "parameters": {
+                "spreadsheetId": "YOUR_GOOGLE_SHEETS_SPREADSHEET_ID",
+                "__IMTCONN__": "YOUR_GOOGLE_SHEETS_CONNECTION_ID"
+              },
+              "mapper": {
+                "from": "drive",
+                "mode": "select",
+                "spreadsheetId": "YOUR_GOOGLE_SHEETS_SPREADSHEET_ID",
+                "sheetId": "YOUR_GOOGLE_SHEETS_SHEET_NAME",
+                "includesHeaders": true,
+                "insertDataOption": "INSERT_ROWS",
+                "values": {
+                  "Datum":          "{{formatDate(now; \"DD.MM.YYYY HH:mm\")}}",
+                  "Name":           "{{1.data.name}}",
+                  "E-Mail":         "{{1.data.email}}",
+                  "Telefon":        "{{1.data.phone}}",
+                  "Dringlichkeit":  "{{1.data.urgency_level}}",
+                  "Eigenkapital":   "{{1.data.equity_status}}",
+                  "Objektart":      "{{1.data.property_type}}",
+                  "Standort":       "{{1.data.location}}",
+                  "Geschätzter Wert": "{{1.data.estimated_value}}",
+                  "Status":         "Neu – Nachfassen",
+                  "Quelle":         "Tally Funnel"
+                }
+              },
+              "metadata": {
+                "designer": { "x": 600, "y": 150 },
+                "restore": {
+                  "parameters": {
+                    "spreadsheetId": { "label": "YOUR_GOOGLE_SHEETS_SPREADSHEET_ID" }
+                  },
+                  "expect": {
+                    "from":             { "label": "Select from the list" },
+                    "mode":             { "label": "Select by ID" },
+                    "insertDataOption": { "label": "Insert rows" },
+                    "includesHeaders":  true
+                  }
+                },
+                "expect": [
+                  { "name": "from",             "type": "select",  "label": "Choose a method" },
+                  { "name": "spreadsheetId",    "type": "string",  "label": "Spreadsheet ID",     "required": true },
+                  { "name": "sheetId",          "type": "select",  "label": "Sheet Name",          "required": true },
+                  { "name": "includesHeaders",  "type": "boolean", "label": "Table contains headers" },
+                  { "name": "insertDataOption", "type": "select",  "label": "Insert data option" },
+                  { "name": "values",           "type": "object",  "label": "Values" }
+                ]
+              }
+            }
+          ],
+          "label": "Standard Lead → Google Sheets",
+          "filter": {
+            "name": "Alle übrigen Leads",
+            "conditions": [
+              [
+                {
+                  "a": "{{1.data.urgency_level}}",
+                  "b": "4",
+                  "o": "number:lessThan"
+                }
+              ],
+              [
+                {
+                  "a": "{{1.data.equity_status}}",
+                  "b": "verified",
+                  "o": "text:notEqual"
+                }
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant":      true,
+    "version":      1,
+    "scenario": {
+      "roundtrips":         1,
+      "maxErrors":          3,
+      "autoCommit":         true,
+      "autoCommitTriggerLast": true,
+      "sequential":         false,
+      "slots":              null,
+      "confidential":       false,
+      "dataloss":           false,
+      "dlq":                false,
+      "freshVariables":     false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "eu1.make.com",
+    "_SETUP_NOTES": {
+      "step_1_webhook": "In Make.com, create a new Webhook trigger. Copy the generated URL into your Tally form → Integrations → Webhooks. Replace YOUR_MAKE_WEBHOOK_ID with the ID Make assigns.",
+      "step_2_telegram": "Replace YOUR_TELEGRAM_BOT_TOKEN with the token from @BotFather. Replace YOUR_TELEGRAM_CHAT_ID with your personal or group chat ID (use @userinfobot to find it).",
+      "step_3_sheets": "Connect your Google account in Make.com. Replace YOUR_GOOGLE_SHEETS_SPREADSHEET_ID with the ID from your sheet URL. Replace YOUR_GOOGLE_SHEETS_SHEET_NAME with the exact tab name.",
+      "step_4_tally_field_names": "The mapper keys (e.g. 1.data.urgency_level) must match the field IDs in your Tally form. Check the raw webhook payload in Make.com's run history after a test submission to confirm exact field names."
+    }
+  }
+}
